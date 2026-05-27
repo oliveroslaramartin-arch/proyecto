@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador Red Escolar</title>
+<style>
+body{margin:0;font-family:Arial;background:#0f172a;color:#fff}
+header{background:#111827;padding:10px;text-align:center}
+#game{display:grid;grid-template-columns:280px 1fr 320px;height:calc(100vh - 70px);gap:10px;padding:10px;box-sizing:border-box}
+.panel{background:#1e293b;padding:12px;overflow:auto}
+#school{position:relative;background:#0b1220;min-width:1050px;overflow:auto}
+.room{position:absolute;border-radius:12px;padding:10px;border:2px solid #fff5;text-align:center;font-weight:bold}
+#dir{left:30px;top:30px;width:180px;height:120px;background:#1d4ed8}
+#lab{left:290px;top:30px;width:230px;height:150px;background:#15803d}
+#doc{left:760px;top:40px;width:190px;height:130px;background:#7c3aed}
+#alu{left:210px;top:270px;width:260px;height:150px;background:#b45309}
+#inv{left:760px;top:330px;width:220px;height:150px;background:#dc2626}
+#imp{left:30px;top:270px;width:140px;height:120px;background:#475569}
+.device{position:absolute;width:70px;height:70px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:move;color:#fff}
+.router{background:#2563eb}.switch{background:#059669}.ap{background:#d97706}
+button,input,select{width:100%;padding:8px;margin:5px 0;border:none;border-radius:8px}
+.good{color:#22c55e}.bad{color:#ef4444}
+.small{font-size:13px;color:#cbd5e1}
+</style>
+</head>
+<body>
+<header><h1>🎮 Simulador de Red Escolar</h1><div id="lvl"></div></header>
+<div id="game">
+<div class="panel">
+<h3>🔧 Dispositivos</h3>
+<button onclick="spawn('router')">📡 Router</button>
+<button onclick="spawn('switch')">🔀 Switch</button>
+<button onclick="spawn('ap')">📶 Access Point</button>
+<p class="small">Crea equipos y arrástralos al mapa.</p>
+<hr>
+<h3>⚙ Configuración</h3>
+<select id="team"></select>
+<input id="ip" placeholder="IP ej 192.168.1.10">
+<input id="mask" value="255.255.255.0">
+<input id="gw" placeholder="Gateway ej 192.168.1.1">
+<input id="dns" value="8.8.8.8">
+<input id="vlan" placeholder="VLAN">
+<button onclick="saveConfig()">Guardar Equipo</button>
+</div>
+<div id="school">
+<div style="position:absolute;bottom:0;left:0;width:100%;height:120px;background:linear-gradient(to top,#14532d,#166534);opacity:.35"></div>
+<div style="position:absolute;bottom:70px;left:80px;font-size:60px;opacity:.2">🏫</div>
+<div style="position:absolute;bottom:30px;right:100px;font-size:50px;opacity:.2">🌳</div>
+<div class="room" id="dir">Dirección</div>
+<div class="room" id="lab">Laboratorio</div>
+<div class="room" id="doc">Docentes</div>
+<div class="room" id="alu">Alumnos</div>
+<div class="room" id="inv">Invitados</div>
+<div class="room" id="imp">Impresoras</div>
+</div>
+<div class="panel">
+<h3>🎯 Objetivo del Nivel</h3><p style="font-size:14px;color:#cbd5e1">Sí, el juego ya tiene los 5 niveles completos.</p>
+<div id="goal"></div>
+<div id="instructions" style="margin-top:10px;font-size:14px;color:#cbd5e1"></div>
+<div style="margin-top:20px; position:sticky; bottom:10px; padding:10px 0;">
+  <button style="padding:14px;font-size:16px;font-weight:bold;background:#22c55e;" onclick="checkLevel()">✅ Verificar Red</button>
+</div>
+<div id="msg"></div>
+<p>⭐ Puntos: <span id="score">0</span></p>
+</div>
+</div>
+<script>
+const levels=[
+{name:'Nivel 1 - Red pequeña',goal:'Coloca Router y Switch. Configura 4 equipos sin IP repetidas.',instructions:'Coloca el Router y el Switch en el mapa. Configura 4 equipos con IP únicas y la VLAN correcta.',devices:['router','switch'],teams:[['Dirección-PC','10'],['Docente-PC','20'],['Alumno-PC','30'],['Impresora','40']]},
+{name:'Nivel 2 - Laboratorio',goal:'Configura PCs del laboratorio y corrige una falla.',instructions:'Agrega el router y el switch. Configura los PCs del laboratorio con la misma VLAN y revisa si hay un error en la configuración.',devices:['router','switch'],teams:[['Lab-1','50'],['Lab-2','50'],['Lab-3','50']]},
+{name:'Nivel 3 - Invitados',goal:'Invitados deben ir separados de administración y usar AP.',instructions:'Asegúrate de tener un Access Point. Separa los invitados de administración con VLAN diferente y configura sus IP correctamente.',devices:['router','switch','ap'],teams:[['Admin-PC','10'],['Invitado-1','99'],['Invitado-2','99']]},
+{name:'Nivel 4 - VLAN',goal:'Todas las áreas deben estar en VLAN correcta.',instructions:'Coloca los dispositivos necesarios y asigna la VLAN correcta a cada área: dirección, docentes, alumnos y laboratorio.',devices:['router','switch'],teams:[['Dirección','10'],['Docentes','20'],['Alumnos','30'],['Laboratorio','50']]},
+{name:'Nivel 5 - Fallas ocultas',goal:'Arregla IP repetidas, gateway y VLAN.',instructions:'Encuentra y corrige IP repetidas, gateway incorrectos y problemas de VLAN. Usa router, switch y AP si es necesario.',devices:['router','switch','ap'],teams:[['PC-Falla','10'],['Invitado','99']]}
+];
+let lvl=0,score=0,placed=[],configs={};
+function load(){
+const L=levels[lvl];
+document.getElementById('lvl').innerText=L.name;
+document.getElementById('goal').innerHTML='<strong>Objetivo:</strong> '+L.goal;
+document.getElementById('instructions').innerHTML = levels.slice(0,lvl+1).map(x=>`<p style="margin:.3em 0"><strong>${x.name}:</strong> ${x.instructions}</p>`).join('');
+document.getElementById('msg').innerHTML='';
+const s=document.getElementById('team'); s.innerHTML='';
+L.teams.forEach(t=>s.innerHTML+=`<option>${t[0]}</option>`);
+configs={};
+}
+function spawn(type){
+const d=document.createElement('div');
+d.className='device '+type; d.innerText=type.toUpperCase();
+d.style.left='50px'; d.style.top='50px';
+d.dataset.type=type;
+draggable(d); school.appendChild(d); placed.push(type);
+}
+function draggable(el){let drag=false,ox,oy;
+el.onmousedown=e=>{drag=true;ox=e.offsetX;oy=e.offsetY;}
+document.onmousemove=e=>{if(!drag)return;const r=school.getBoundingClientRect();el.style.left=(e.clientX-r.left-ox)+'px';el.style.top=(e.clientY-r.top-oy)+'px';}
+document.onmouseup=()=>drag=false;}
+function saveConfig(){
+const name=team.value;
+configs[name]={ip:ip.value,mask:mask.value,gw:gw.value,dns:dns.value,vlan:vlan.value};
+msg.innerHTML='<p class="good">Configuración guardada</p>';
+}
+function sameNet(ip,gw){if(!ip||!gw)return false;let a=ip.split('.'),b=gw.split('.');return a[0]==b[0]&&a[1]==b[1]&&a[2]==b[2];}
+function checkLevel(){
+let errors=[]; const L=levels[lvl];
+L.devices.forEach(d=>{if(!placed.includes(d))errors.push('Falta '+d);});
+let ips=[];
+L.teams.forEach(t=>{
+let c=configs[t[0]];
+if(!c){errors.push(t[0]+' sin configurar'); return;}
+if(ips.includes(c.ip)) errors.push('IP repetida '+c.ip);
+ips.push(c.ip);
+if(c.vlan!==t[1]) errors.push(t[0]+' VLAN incorrecta');
+if(!sameNet(c.ip,c.gw)) errors.push(t[0]+' gateway incorrecto');
+});
+if(lvl===2){
+let admin=configs['Admin-PC']; let inv1=configs['Invitado-1'];
+if(admin&&inv1&&admin.vlan===inv1.vlan) errors.push('Invitados mezclados con administración');
+if(!placed.includes('ap')) errors.push('Falta Access Point');
+}
+if(errors.length){msg.innerHTML='<p class="bad">❌ '+errors.join('<br>')+'</p>';}
+else{
+score+=100; document.getElementById('score').textContent = score;
+msg.innerHTML='<p class="good">✅ Nivel completado</p>';
+setTimeout(()=>{lvl++;document.querySelectorAll('.device').forEach(x=>x.remove());placed=[]; if(lvl<levels.length) load(); else alert('🏆 ¡Ganaste el simulador!');},1200);
+}
+}
+load();
+</script>
+</body>
+</html>
