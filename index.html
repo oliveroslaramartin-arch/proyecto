@@ -9,7 +9,7 @@ body{margin:0;font-family:Arial;background:#0f172a;color:#fff}
 header{background:#111827;padding:10px;text-align:center}
 #game{display:grid;grid-template-columns:280px 1fr 320px;height:calc(100vh - 70px);gap:10px;padding:10px;box-sizing:border-box}
 .panel{background:#1e293b;padding:12px;overflow:auto}
-#school{position:relative;background:#0b1220;min-width:0;overflow:auto}
+#school{position:relative;background:#0b1220;min-width:1050px;overflow:auto}
 .room{position:absolute;border-radius:12px;padding:10px;border:2px solid #fff5;text-align:center;font-weight:bold}
 #dir{left:30px;top:30px;width:180px;height:120px;background:#1d4ed8}
 #lab{left:290px;top:30px;width:230px;height:150px;background:#15803d}
@@ -22,6 +22,11 @@ header{background:#111827;padding:10px;text-align:center}
 button,input,select{width:100%;padding:8px;margin:5px 0;border:none;border-radius:8px}
 .good{color:#22c55e}.bad{color:#ef4444}
 .small{font-size:13px;color:#cbd5e1}
+@media (max-width:1000px){
+  #game{grid-template-columns:1fr; height:auto}
+  #school{min-width:0;width:100%;min-height:500px}
+  .panel{max-height:none}
+}
 </style>
 </head>
 <body>
@@ -95,9 +100,7 @@ function draggable(el){
   let drag=false, ox=0, oy=0;
   const getPos=(e)=>{
     const r=school.getBoundingClientRect();
-    let clientX=e.clientX, clientY=e.clientY;
-    if(e.touches && e.touches[0]){clientX=e.touches[0].clientX; clientY=e.touches[0].clientY;}
-    return {x: clientX-r.left, y: clientY-r.top};
+    return {x: e.clientX - r.left, y: e.clientY - r.top};
   };
   const start=(e)=>{
     e.preventDefault();
@@ -107,6 +110,7 @@ function draggable(el){
     const schoolRect=school.getBoundingClientRect();
     ox = pos.x - (rect.left - schoolRect.left);
     oy = pos.y - (rect.top - schoolRect.top);
+    el.setPointerCapture(e.pointerId);
   };
   const move=(e)=>{
     if(!drag) return;
@@ -115,14 +119,14 @@ function draggable(el){
     el.style.left = (pos.x - ox) + 'px';
     el.style.top = (pos.y - oy) + 'px';
   };
-  const stop=()=>{drag=false;};
-  el.addEventListener('mousedown', start);
-  el.addEventListener('touchstart', start, {passive:false});
-  document.addEventListener('mousemove', move);
-  document.addEventListener('touchmove', move, {passive:false});
-  document.addEventListener('mouseup', stop);
-  document.addEventListener('touchend', stop);
-  document.addEventListener('touchcancel', stop);
+  const stop=(e)=>{
+    drag=false;
+    if(e.pointerId && el.releasePointerCapture) el.releasePointerCapture(e.pointerId);
+  };
+  el.addEventListener('pointerdown', start);
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', stop);
+  document.addEventListener('pointercancel', stop);
 }
 function saveConfig(){
 const name=team.value;
