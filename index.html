@@ -9,7 +9,7 @@ body{margin:0;font-family:Arial;background:#0f172a;color:#fff}
 header{background:#111827;padding:10px;text-align:center}
 #game{display:grid;grid-template-columns:280px 1fr 320px;height:calc(100vh - 70px);gap:10px;padding:10px;box-sizing:border-box}
 .panel{background:#1e293b;padding:12px;overflow:auto}
-#school{position:relative;background:#0b1220;min-width:1050px;overflow:auto}
+#school{position:relative;background:#0b1220;min-width:0;overflow:auto}
 .room{position:absolute;border-radius:12px;padding:10px;border:2px solid #fff5;text-align:center;font-weight:bold}
 #dir{left:30px;top:30px;width:180px;height:120px;background:#1d4ed8}
 #lab{left:290px;top:30px;width:230px;height:150px;background:#15803d}
@@ -17,7 +17,7 @@ header{background:#111827;padding:10px;text-align:center}
 #alu{left:210px;top:270px;width:260px;height:150px;background:#b45309}
 #inv{left:760px;top:330px;width:220px;height:150px;background:#dc2626}
 #imp{left:30px;top:270px;width:140px;height:120px;background:#475569}
-.device{position:absolute;width:70px;height:70px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:move;color:#fff}
+.device{position:absolute;width:70px;height:70px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:move;color:#fff;touch-action:none}
 .router{background:#2563eb}.switch{background:#059669}.ap{background:#d97706}
 button,input,select{width:100%;padding:8px;margin:5px 0;border:none;border-radius:8px}
 .good{color:#22c55e}.bad{color:#ef4444}
@@ -91,10 +91,39 @@ d.style.left='50px'; d.style.top='50px';
 d.dataset.type=type;
 draggable(d); school.appendChild(d); placed.push(type);
 }
-function draggable(el){let drag=false,ox,oy;
-el.onmousedown=e=>{drag=true;ox=e.offsetX;oy=e.offsetY;}
-document.onmousemove=e=>{if(!drag)return;const r=school.getBoundingClientRect();el.style.left=(e.clientX-r.left-ox)+'px';el.style.top=(e.clientY-r.top-oy)+'px';}
-document.onmouseup=()=>drag=false;}
+function draggable(el){
+  let drag=false, ox=0, oy=0;
+  const getPos=(e)=>{
+    const r=school.getBoundingClientRect();
+    let clientX=e.clientX, clientY=e.clientY;
+    if(e.touches && e.touches[0]){clientX=e.touches[0].clientX; clientY=e.touches[0].clientY;}
+    return {x: clientX-r.left, y: clientY-r.top};
+  };
+  const start=(e)=>{
+    e.preventDefault();
+    drag=true;
+    const pos=getPos(e);
+    const rect=el.getBoundingClientRect();
+    const schoolRect=school.getBoundingClientRect();
+    ox = pos.x - (rect.left - schoolRect.left);
+    oy = pos.y - (rect.top - schoolRect.top);
+  };
+  const move=(e)=>{
+    if(!drag) return;
+    e.preventDefault();
+    const pos=getPos(e);
+    el.style.left = (pos.x - ox) + 'px';
+    el.style.top = (pos.y - oy) + 'px';
+  };
+  const stop=()=>{drag=false;};
+  el.addEventListener('mousedown', start);
+  el.addEventListener('touchstart', start, {passive:false});
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('mouseup', stop);
+  document.addEventListener('touchend', stop);
+  document.addEventListener('touchcancel', stop);
+}
 function saveConfig(){
 const name=team.value;
 configs[name]={ip:ip.value,mask:mask.value,gw:gw.value,dns:dns.value,vlan:vlan.value};
